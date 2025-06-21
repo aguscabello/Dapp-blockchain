@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import Web3 from "web3";
 import ABI from "./ObrasRepo.json";
 import './App.css'; 
-import { create } from 'ipfs-http-client';
+import axios from 'axios'; 
 
 
 const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-const client = create({ url: "https://ipfs.io" });
-
+const HARDHAT_CHAIN_ID = '1337'; 
+const HARDHAT_CHAIN_ID_HEX = '0x539';
 
 
 function App() {
@@ -20,45 +20,61 @@ function App() {
   const [cargando, setCargando] = useState(true); 
 
  
-  const conectarBilletera = async () => {
+   const conectarBilletera = async () => {
     setFeedback("Conectando...");
-    if (window.ethereum) {
-      try {
-        const cuentas = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        
-        const web3Instance = new Web3(window.ethereum);
-        setProvider(web3Instance);
-        
-        const cuentaActual = cuentas[0];
-        setCuenta(cuentaActual);
-
-        const instanciaContrato = new web3Instance.eth.Contract(ABI.abi, CONTRACT_ADDRESS);
-        setContrato(instanciaContrato);
-
-        setFeedback("Billetera conectada exitosamente.");
-      } catch (error) {
-        console.error("Usuario rechazó la conexión.", error);
-        setFeedback("Error al conectar la billetera. Por favor, inténtalo de nuevo.");
-      }
-    } else {
+    if (!window.ethereum) {
       alert("Por favor, instala MetaMask para usar esta DApp.");
       setFeedback("MetaMask no detectado.");
+      return;
+    }
+
+    try {
+      const web3Instance = new Web3(window.ethereum);
+      
+      const chainId = await web3Instance.eth.getChainId();
+
+      if (chainId.toString() !== HARDHAT_CHAIN_ID) {
+        setFeedback(`Por favor, cambia a la red de Hardhat (Chain ID ${HARDHAT_CHAIN_ID})`);
+        
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: HARDHAT_CHAIN_ID_HEX }],
+          });
+          
+        } catch (switchError) {
+          
+          if (switchError.code === 4902) {
+             setFeedback("La red de Hardhat no está en tu MetaMask. Por favor, añádela manualmente.");
+          } else {
+             setFeedback("No se pudo cambiar de red. Por favor, hazlo manualmente en MetaMask.");
+          }
+          console.error("Error al cambiar de red:", switchError);
+          return; 
+        }
+      }
+
+      setFeedback("Red correcta. Conectando cuenta...");
+      const cuentas = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      
+      setProvider(web3Instance);
+      const cuentaActual = cuentas[0];
+      setCuenta(cuentaActual);
+
+      const instanciaContrato = new web3Instance.eth.Contract(ABI.abi, CONTRACT_ADDRESS);
+      setContrato(instanciaContrato);
+
+      setFeedback("Billetera conectada exitosamente.");
+      
+    } catch (error) {
+      console.error("Error en el proceso de conexión:", error);
+      setFeedback("Error al conectar la billetera. Por favor, inténtalo de nuevo.");
     }
   };
 
+  
 
-  const subirMetadataAIPFS = async (obra) => {
-    const metadata = {
-      name: obra.titulo,
-      description: obra.descripcion,
-      type: obra.tipo,
-      image: obra.imagenIPFS ? `ipfs://${obra.imagenIPFS}` : undefined,
-    };
-
-    const metadataString = JSON.stringify(metadata);
-    const result = await client.add(metadataString);
-    return `ipfs://${result.path}`;
-  };
+  
 
  
   const cargarObras = async (instanciaContrato) => {
@@ -103,7 +119,14 @@ function App() {
   }, [contrato]);
 
 
- const subirObraFormulario = async (e) => {
+//-----------------------------------
+
+
+
+
+
+
+const subirObraFormulario = async (e) => {
     e.preventDefault();
     const form = e.target;
     const titulo = form.titulo.value;
@@ -116,30 +139,68 @@ function App() {
       return;
     }
 
-    setFeedback("Subiendo a IPFS...");
+    setFeedback("Subiendo archivo a Pinata (IPFS)...");
 
     try {
-      let imagenIPFS = null;
+      let archivoHash = null;
       if (archivo) {
-        const res = await client.add(archivo);
-        imagenIPFS = res.path;
+        const formData = new FormData();
+        formData.append("file", archivo);
+
+        const resFile = await axios({
+          method: "post",
+          url: "https://api.pinata.cloud/pinning/pinFileToIPFS",
+          data: formData,
+          headers: {
+            'Authorization': `Bearer ${process.env.REACT_APP_PINATA_JWT}`,
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        archivoHash = resFile.data.IpfsHash;
       }
+      
+      setFeedback(`Archivo subido! Hash: ${archivoHash}. Creando y subiendo metadatos...`);
 
-      const metadataURI = await subirMetadataAIPFS({ titulo, descripcion, tipo, imagenIPFS });
+      const metadata = {
+        name: titulo,
+        description: descripcion,
+        type: tipo,
+        image: archivoHash ? `ipfs://${archivoHash}` : undefined,
+      };
 
-      setFeedback("Registrando obra en la blockchain...");
+      const resJSON = await axios({
+        method: "post",
+        url: "https://api.pinata.cloud/pinning/pinJSONToIPFS",
+        data: {
+          pinataContent: metadata
+        },
+        headers: {
+          'Authorization': `Bearer ${process.env.REACT_APP_PINATA_JWT}`,
+        },
+      });
+
+      const metadataHash = resJSON.data.IpfsHash;
+      const metadataURI = `ipfs://${metadataHash}`;
+      
+      setFeedback(`Metadatos subidos! URI: ${metadataURI}. Enviando transacción a la blockchain...`);
+
       await contrato.methods.subirObra(metadataURI).send({ from: cuenta });
 
-      setFeedback("¡Obra subida correctamente!");
+      setFeedback("¡Obra registrada correctamente en la blockchain! Actualizando galería...");
       form.reset();
       await cargarObras(contrato);
+
     } catch (error) {
       console.error("Error al subir obra:", error);
-      setFeedback("Error al subir la obra.");
+      setFeedback(`Error: ${error.message}`);
     }
   };
 
   
+
+
+//------------------------------------------
+
   if (!cuenta) {
     return (
       <div className="container text-center py-5">

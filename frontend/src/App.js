@@ -5,10 +5,9 @@ import './App.css';
 import axios from 'axios'; 
 
 
-const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-const HARDHAT_CHAIN_ID = '1337'; 
-const HARDHAT_CHAIN_ID_HEX = '0x539';
-
+const CONTRACT_ADDRESS = "0xd08D762E7f13b7f9f7A727ADB4e34F9e6f820518";
+const SEPOLIA_CHAIN_ID = '11155111';
+const SEPOLIA_CHAIN_ID_HEX = '0xaa36a7'; 
 
 function App() {
   const [provider, setProvider] = useState(null);
@@ -33,13 +32,13 @@ function App() {
       
       const chainId = await web3Instance.eth.getChainId();
 
-      if (chainId.toString() !== HARDHAT_CHAIN_ID) {
-        setFeedback(`Por favor, cambia a la red de Hardhat (Chain ID ${HARDHAT_CHAIN_ID})`);
+     if (chainId.toString() !== SEPOLIA_CHAIN_ID) {
+      setFeedback(`Por favor, cambia a la red de Sepolia (Chain ID ${SEPOLIA_CHAIN_ID})`);
         
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: HARDHAT_CHAIN_ID_HEX }],
+            params: [{ chainId: SEPOLIA_CHAIN_ID_HEX }],
           });
           
         } catch (switchError) {

@@ -7,7 +7,7 @@ La DApp está desplegada y funcionando en la **red de pruebas Sepolia**.
 ## Requisitos Previos
 1.  **Un navegador web** con la extensión [MetaMask](https://metamask.io/) instalada.
 2.  **Node.js** y **npm** instalados en tu sistema.
-3.  **ETH de prueba en la red Sepolia.** Puedes obtenerlo de forma gratuita en un faucet como [https://sepolia-faucet.pk910.de/]
+3.  **ETH de prueba en la red Sepolia.** Podes obtenerlo de forma gratuita en un faucet como [https://sepolia-faucet.pk910.de/]
 
 ## Cómo Probar la Aplicación
 1.  **Clona o descarga este repositorio.**

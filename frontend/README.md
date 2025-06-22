@@ -28,7 +28,7 @@ La DApp está desplegada y funcionando en la **red de pruebas Sepolia**.
 
  La aplicación se abrirá automáticamente en `http://localhost:3000`.
 
- 5.  **Conecta MetaMask:**
+ 5.  ** Conecta MetaMask:**
     *   Click en el botón"Conectar Billetera".
     *   La aplicación detecta si no estás en la red Sepolia y te pide que cambies de red. Acepta la solicitud en MetaMask.
     *   Una vez conectado, vas a poder ver la galería de obras y el formulario para subir la tuya.
